@@ -3,7 +3,6 @@ from datetime import datetime
 import subprocess
 
 
-
 def log(content):
     caller = inspect.getframeinfo(inspect.currentframe().f_back)[2]
     print "[%s] [%s] %s" % (str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')), caller, content)

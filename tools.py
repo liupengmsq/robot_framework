@@ -30,18 +30,19 @@ if __name__ == "__main__":
     request_util = VerifyRequest('http://172.16.2.111:9096/heika-verify/')
 
     if sys.argv[1] == 'init':
-        for user_id in sys.argv[2:]:
-            libs.helper.log('将user_id为%s的用户置为待调查状态' % user_id)
-            update_user_to_inquireing_status(user_id)
+        with DBHelper() as db_helper:
+            for user_id in sys.argv[2:]:
+                libs.helper.log('将user_id为%s的用户置为待调查状态' % user_id)
+                db_helper.update_user_to_inquireing_status(user_id)
 
-            libs.helper.log('删除审核状态表原有数据')
-            delete_verify_user_status_by_user_id(user_id)
+                libs.helper.log('删除审核状态表原有数据')
+                db_helper.delete_verify_user_status_by_user_id(user_id)
 
-            libs.helper.log('调用接口模拟初始化审核状态')
-            libs.helper.log(request_util.init_user_from_mobile(user_id))
+                libs.helper.log('调用接口模拟初始化审核状态')
+                libs.helper.log(request_util.init_user_from_mobile(user_id))
 
-            libs.helper.log('调用接口模拟提交审核')
-            libs.helper.log(request_util.commit_user_from_mobile(user_id))
+                libs.helper.log('调用接口模拟提交审核')
+                libs.helper.log(request_util.commit_user_from_mobile(user_id))
         sys.exit(0)
 
     if sys.argv[1] == 'init_dubbo':
@@ -57,17 +58,18 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if sys.argv[1] == 'cleanup_by_user_id':
-        for user_id in sys.argv[2:]:
-            libs.helper.log('将user_id为%s的用户任务清除' % user_id)
-            verify_user_status_id = get_verify_user_status_id_by_user_id(user_id)
+        with DBHelper() as db_helper:
+            for user_id in sys.argv[2:]:
+                libs.helper.log('将user_id为%s的用户任务清除' % user_id)
+                verify_user_status_id = db_helper.get_verify_user_status_id_by_user_id(user_id)
 
-            if verify_user_status_id is None:
-                libs.helper.log_error('未找到user_id=%s对应的verify_user_status数据' % user_id)
-                pass
+                if verify_user_status_id is None:
+                    libs.helper.log_error('未找到user_id=%s对应的verify_user_status数据' % user_id)
+                    pass
 
-            libs.helper.log('verify_user_status_id = %s' % verify_user_status_id)
-            libs.helper.log('删除verify_process_task表中的数据, verify_user_status_id为%s' % verify_user_status_id)
-            delete_verify_process_task_by_verify_user_status_id(verify_user_status_id)
+                libs.helper.log('verify_user_status_id = %s' % verify_user_status_id)
+                libs.helper.log('删除verify_process_task表中的数据, verify_user_status_id为%s' % verify_user_status_id)
+                db_helper.delete_verify_process_task_by_verify_user_status_id(verify_user_status_id)
         sys.exit(0)
 
     if sys.argv[1] == 'cleanup_by_executor_name':
@@ -136,24 +138,25 @@ if __name__ == "__main__":
         user_nick_name_prefix = sys.argv[3]
         register_time = sys.argv[4]
         sent_status = sys.argv[5:]
-        user_keys = get_user_keys_by_nick_name_prefix(user_nick_name_prefix, count_of_user)
+        with DBHelper() as db_helper:
+            user_keys = db_helper.get_user_keys_by_nick_name_prefix(user_nick_name_prefix, count_of_user)
 
-        time = None
-        if register_time == 'current':
-            time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        else:
-            time = register_time
+            time = None
+            if register_time == 'current':
+                time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                time = register_time
 
-        if sys.argv[1].endswith('cleanup'):
-            delete_user_from_system_grant_coupon(*user_keys)
-        else:
-            coupon_sent_user_keys = get_user_keys_from_system_grant_coupon(*sent_status)
-            coupon_not_sent_user_keys = []
-            for i in user_keys:
-                if i[0] not in coupon_sent_user_keys:
-                    coupon_not_sent_user_keys.append(i[0])
-            update_user_register_time_to_current_by_user_key(time, *coupon_not_sent_user_keys)
-            populate_user_into_system_grant_coupon(*coupon_not_sent_user_keys)
+            if sys.argv[1].endswith('cleanup'):
+                db_helper.delete_user_from_system_grant_coupon(*user_keys)
+            else:
+                coupon_sent_user_keys = db_helper.get_user_keys_from_system_grant_coupon(*sent_status)
+                coupon_not_sent_user_keys = []
+                for i in user_keys:
+                    if i[0] not in coupon_sent_user_keys:
+                        coupon_not_sent_user_keys.append(i[0])
+                db_helper.update_user_register_time_to_current_by_user_key(time, *coupon_not_sent_user_keys)
+                db_helper.populate_user_into_system_grant_coupon(*coupon_not_sent_user_keys)
 
     if sys.argv[1] == 'prepare_verify_test_data':
         user_key = sys.argv[2]
@@ -178,20 +181,3 @@ if __name__ == "__main__":
         # libs.helper.log(str.format('返回结果： {0}, {1}', response.result_code, response.application_id))
 
         libs.helper.log('Done')
-
-
-    if sys.argv[1] == 'test':
-        # delete_user_info_result(1)
-        # populate_user_info_result(1, 'PENDING')
-        # update_verify_user_status_to_inquire_success(100034833, 1, 'investigate note', 12)
-        # ret = get_latest_verify_user_status_log(100034832)
-        # if ret is not None:
-        #     print ret[0], ret[1]
-        # flow_task_request = FlowTaskManage('http://172.16.2.38:15081/', username='liupeng@renrendai.com')
-        # flow_task_request.login()
-        # response = flow_task_request.flow_setup('PEOPLE', 3, 69, 73)
-        # response = flow_task_request.get_pending_tasks()
-        # print response
-        ret = get_incorrect_user_ids()
-
-        print ret;
